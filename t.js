@@ -1,12 +1,11 @@
 import { randomUUID } from "crypto";
 import { Decoder, Encoder } from "@msgpack/msgpack";
-import { collapseTextChangeRangesAcrossMultipleVersions } from "typescript";
 
 const PORT = "5810";
-const url = "ws://localhost:" + PORT + "/nt/" + randomUUID();
-const socket = new WebSocket(url);
+const serverAddr = "ws://localhost:" + PORT + "/nt/nt4.js";
+const socket = new WebSocket(serverAddr);
 
-console.log(`Listening on ${url}`);
+console.log(`Listening on ${serverAddr}`);
 
 const msgpackDecoder = new Decoder();
 const msgpackEncoder = new Encoder();
@@ -145,19 +144,58 @@ socket.addEventListener("message", event => {
 const subuid = Math.floor(Math.random() * 99999999);
 const options = {};
 
+function ws_onOpen(ws) {
+  // Set the flag allowing general server communication
+  serverConnectionActive = true;
+  console.log('[NT4] Connected with protocol "' + ws.protocol + '"');
+
+  // If v4.1, start RTT only ws
+  if (ws.protocol === "v4.1.networktables.first.wpi.edu") {
+    ws_connect(true);
+  } else {
+    // v4.0 and RTT only should send timestamp
+    // ws_sendTimestamp();
+  }
+
+  // if (ws.protocol !== "rtt.networktables.first.wpi.edu") {
+  //   // Publish any existing topics
+  //   for (const topic of this.publishedTopics.values()) {
+  //     this.ws_publish(topic);
+  //   }
+
+  //   // Subscribe to existing subscriptions
+  //   for (const subscription of this.subscriptions.values()) {
+  //     this.ws_subscribe(subscription);
+  //   }
+
+  //   // User connection-opened hook
+  //   this.onConnect();
+  // }
+}
+
 // socket opened
 socket.addEventListener("open", event => {
     console.log("Opened!");
-    socket.send(JSON.stringify([
-        {
-            method: 'subscribe',
-            params: {
-                topics: ["/Robot/Swerve/Pose"],
-                subuid,
-                options
-            }
-        }
-    ]));
+    // ????
+    const rttWs = false;
+    // Copy advantagescope
+    const ws = new WebSocket(
+      serverAddr,
+      rttWs ? ["rtt.networktables.first.wpi.edu"] : ["v4.1.networktables.first.wpi.edu", "networktables.first.wpi.edu"]
+    );
+    ws.binaryType = "arraybuffer";
+    ws.addEventListener("open", () => ws_onOpen(ws));
+    ws.addEventListener("message", (event) => ws_onMessage(event, rttWs));
+    // socket.send(JSON.stringify([
+    //     {
+    //         method: 'subscribe',
+    //         params: {
+    //             topics: ["/Robot/Swerve/Pose"],
+    //             subuid,
+    //             options
+    //         }
+    //     }
+    // ]));
 });
 // socket closed
 socket.addEventListener("close", event => {
